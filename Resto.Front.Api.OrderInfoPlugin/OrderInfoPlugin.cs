@@ -12,39 +12,62 @@ namespace Resto.Front.Api.OrderInfoPlugin {
 
     [PluginLicenseModuleId(21005108)]
     public class OrderInfoPlugin : IFrontPlugin {
-        private readonly CompositeDisposable subscriptions;
+        private CompositeDisposable subscriptions;
+        private CompositeDisposable buttons;
 
         public OrderInfoPlugin() {
             Log.Info("Initializing OrderInfoPlugin");
 
-            subscriptions = new CompositeDisposable {
-                AddButtonNumberOfPositions(),
-
-                Notifications
-                    .OrderChanged
-                    .Where(x => x.EventType == Data.Common.EntityEventType.Created)
-                    .Select(x => x.Entity)
-                    .Where(x => !(x is IDeliveryOrder))
-                    .Subscribe(x => Operations.AddNotificationMessage(string.Format(OrderInfoPluginLocalResources.CreatedOrder, x.Number), nameof(OrderInfoPlugin))),
-
-                Notifications
-                    .DeliveryOrderChanged
-                    .Where(x => x.EventType == Data.Common.EntityEventType.Created)
-                    .Select(x => x.Entity)
-                    .Subscribe(x => Operations.AddNotificationMessage(string.Format(OrderInfoPluginLocalResources.CreatedDeliveryOrder, x.Number), nameof(OrderInfoPlugin))),
-
-                Notifications.CurrentCultureChanged.Subscribe(x => {
-                        CultureInfo.CurrentCulture = x.culture;
-                        CultureInfo.CurrentUICulture = x.uiCulture;
-                        CultureInfo.DefaultThreadCurrentCulture = x.culture;
-                        CultureInfo.DefaultThreadCurrentUICulture = x.uiCulture;
-                }),
-            };
+            SubcribeOnEvents();
+            CreateButtons();
 
             Operations.AddNotificationMessage(string.Format(OrderInfoPluginLocalResources.PluginStarted, nameof(OrderInfoPlugin)), nameof(OrderInfoPlugin));
             
 
             Log.Info("OrderInfoPlugin started");
+        }
+
+        public void CreateButtons() {
+            buttons = new CompositeDisposable {
+                AddButtonNumberOfPositions(),
+            };
+        }
+
+        public void SubcribeOnEvents() {
+            subscriptions = new CompositeDisposable {
+                SubscribeOnDeliveryOrderCreated(x => Operations.AddNotificationMessage(string.Format(OrderInfoPluginLocalResources.CreatedDeliveryOrder, x.Number), nameof(OrderInfoPlugin))),
+                SubscribeOnOrderCreated(x => Operations.AddNotificationMessage(string.Format(OrderInfoPluginLocalResources.CreatedOrder, x.Number), nameof(OrderInfoPlugin))),
+                SubscribeOnCultureChanged()
+            };
+        }
+
+        public IDisposable SubscribeOnCultureChanged() {
+            return Notifications.CurrentCultureChanged.Subscribe(x => {
+                CultureInfo.CurrentCulture = x.culture;
+                CultureInfo.CurrentUICulture = x.uiCulture;
+                CultureInfo.DefaultThreadCurrentCulture = x.culture;
+                CultureInfo.DefaultThreadCurrentUICulture = x.uiCulture;
+                
+                buttons?.Dispose();
+                CreateButtons();
+            });
+        }
+
+        public IDisposable SubscribeOnDeliveryOrderCreated(Action<IDeliveryOrder> action) {
+            return Notifications
+                    .DeliveryOrderChanged
+                    .Where(x => x.EventType == Data.Common.EntityEventType.Created)
+                    .Select(x => x.Entity)
+                    .Subscribe(action);
+        }
+
+        public IDisposable SubscribeOnOrderCreated(Action<IOrder> action) {
+            return Notifications
+                    .OrderChanged
+                    .Where(x => x.EventType == Data.Common.EntityEventType.Created)
+                    .Select(x => x.Entity)
+                    .Where(x => !(x is IDeliveryOrder))
+                    .Subscribe(action);
         }
 
         public IDisposable AddButtonNumberOfPositions() {
@@ -55,7 +78,8 @@ namespace Resto.Front.Api.OrderInfoPlugin {
         }
 
         public void Dispose() {
-            subscriptions.Dispose();
+            subscriptions?.Dispose();
+            buttons?.Dispose();
         }
     }
 }
