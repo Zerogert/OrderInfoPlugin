@@ -47,7 +47,8 @@ namespace Resto.Front.Api.OrderInfoPlugin {
                 CultureInfo.CurrentUICulture = x.uiCulture;
                 CultureInfo.DefaultThreadCurrentCulture = x.culture;
                 CultureInfo.DefaultThreadCurrentUICulture = x.uiCulture;
-                
+
+                //to update localization on UI elements you need to recreate them
                 buttons?.Dispose();
                 CreateButtons();
             });
@@ -66,7 +67,7 @@ namespace Resto.Front.Api.OrderInfoPlugin {
                     .OrderChanged
                     .Where(x => x.EventType == Data.Common.EntityEventType.Created)
                     .Select(x => x.Entity)
-                    .Where(x => !(x is IDeliveryOrder))
+                    .Where(x => !(x is IDeliveryOrder)) //you need to filter delivered and regular orders
                     .Subscribe(action);
         }
 
